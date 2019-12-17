@@ -659,11 +659,11 @@ namespace Microsoft.Health.Fhir.CosmosDb.Features.Storage
         }
 
         [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-        System.Linq.IOrderedQueryable<T> Microsoft.Azure.Documents.IDocumentClient.CreateDocumentQuery<T>(System.String collectionLink, Microsoft.Azure.Documents.Client.FeedOptions feedOptions)
+        System.Linq.IOrderedQueryable<Microsoft.Azure.Documents.Document> Microsoft.Azure.Documents.IDocumentClient.CreateDocumentQuery(System.String collectionLink, Microsoft.Azure.Documents.Client.FeedOptions feedOptions)
         {
             try
             {
-                return _inner.CreateDocumentQuery<T>(collectionLink, UpdateOptions(feedOptions));
+                return _inner.CreateDocumentQuery(collectionLink, UpdateOptions(feedOptions));
             }
             catch (System.Exception ex)
             {
@@ -673,11 +673,11 @@ namespace Microsoft.Health.Fhir.CosmosDb.Features.Storage
         }
 
         [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-        System.Linq.IOrderedQueryable<Microsoft.Azure.Documents.Document> Microsoft.Azure.Documents.IDocumentClient.CreateDocumentQuery(System.String collectionLink, Microsoft.Azure.Documents.Client.FeedOptions feedOptions)
+        System.Linq.IOrderedQueryable<T> Microsoft.Azure.Documents.IDocumentClient.CreateDocumentQuery<T>(System.String collectionLink, Microsoft.Azure.Documents.Client.FeedOptions feedOptions)
         {
             try
             {
-                return _inner.CreateDocumentQuery(collectionLink, UpdateOptions(feedOptions));
+                return _inner.CreateDocumentQuery<T>(collectionLink, UpdateOptions(feedOptions));
             }
             catch (System.Exception ex)
             {
@@ -715,11 +715,11 @@ namespace Microsoft.Health.Fhir.CosmosDb.Features.Storage
         }
 
         [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-        System.Linq.IQueryable<T> Microsoft.Azure.Documents.IDocumentClient.CreateDocumentQuery<T>(System.String collectionLink, System.String sqlExpression, Microsoft.Azure.Documents.Client.FeedOptions feedOptions)
+        System.Linq.IQueryable<System.Object> Microsoft.Azure.Documents.IDocumentClient.CreateDocumentQuery(System.String collectionLink, System.String sqlExpression, Microsoft.Azure.Documents.Client.FeedOptions feedOptions)
         {
             try
             {
-                return _inner.CreateDocumentQuery<T>(collectionLink, sqlExpression, UpdateOptions(feedOptions));
+                return _inner.CreateDocumentQuery(collectionLink, sqlExpression, UpdateOptions(feedOptions));
             }
             catch (System.Exception ex)
             {
@@ -729,11 +729,11 @@ namespace Microsoft.Health.Fhir.CosmosDb.Features.Storage
         }
 
         [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-        System.Linq.IQueryable<System.Object> Microsoft.Azure.Documents.IDocumentClient.CreateDocumentQuery(System.String collectionLink, System.String sqlExpression, Microsoft.Azure.Documents.Client.FeedOptions feedOptions)
+        System.Linq.IQueryable<T> Microsoft.Azure.Documents.IDocumentClient.CreateDocumentQuery<T>(System.String collectionLink, System.String sqlExpression, Microsoft.Azure.Documents.Client.FeedOptions feedOptions)
         {
             try
             {
-                return _inner.CreateDocumentQuery(collectionLink, sqlExpression, UpdateOptions(feedOptions));
+                return _inner.CreateDocumentQuery<T>(collectionLink, sqlExpression, UpdateOptions(feedOptions));
             }
             catch (System.Exception ex)
             {
