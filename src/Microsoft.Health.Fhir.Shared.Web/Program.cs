@@ -20,16 +20,8 @@ namespace Microsoft.Health.Fhir.Web
                 .ConfigureAppConfiguration((hostContext, builder) =>
                 {
                     var builtConfig = builder.Build();
-
-                    var keyVaultEndpoint = builtConfig["KeyVault:Endpoint"];
-                    if (!string.IsNullOrEmpty(keyVaultEndpoint))
-                    {
-                        var azureServiceTokenProvider = new AzureServiceTokenProvider();
-                        var keyVaultClient = new KeyVaultClient(new KeyVaultClient.AuthenticationCallback(azureServiceTokenProvider.KeyVaultTokenCallback));
-                        builder.AddAzureKeyVault(keyVaultEndpoint, keyVaultClient, new DefaultKeyVaultSecretManager());
-                    }
-
-                    builder.AddDevelopmentAuthEnvironment(builtConfig["TestAuthEnvironment:FilePath"]);
+                    builder.AddJsonFile(
+                        "appsettings.json", optional: false, reloadOnChange: false);
                 })
                 .UseStartup<Startup>()
                 .Build();
