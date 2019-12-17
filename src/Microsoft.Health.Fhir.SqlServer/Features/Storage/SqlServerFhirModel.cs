@@ -145,7 +145,7 @@ namespace Microsoft.Health.Fhir.SqlServer.Features.Storage
         {
             if (!_schemaInformation.Current.HasValue)
             {
-                _logger.LogError($"The current version of the database is not available. Unable in initialize {nameof(SqlServerFhirModel)}.");
+                _logger.LogError($"The current version of the database is not available. Unable to initialize {nameof(SqlServerFhirModel)}.");
                 throw new ServiceUnavailableException();
             }
 
