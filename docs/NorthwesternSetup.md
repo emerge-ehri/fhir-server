@@ -128,3 +128,172 @@ Digging in a little more, I forgot that there was [this Docker file](https://git
 ```
 
 Cool - so even though going to [http://localhost:5000/](http://localhost:5000/) gives us an error, we get a response when going through Postman.
+
+At the end of the day, here's how we stop our SQL Server docker container:
+
+```
+docker ps  # shows running containers, get ID
+docker stop <ID>  # ID is like b1e226adc4e0
+docker ps  # Confirm it shut down
+```
+
+## Starting Back Up
+When getting back to this, here's how to get stuff running again:
+
+```
+docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=tMk%e9?FsE7=tsSz' -p 1433:1433 -d mcr.microsoft.com/mssql/server:2017-CU8-ubuntu
+
+cd ~/Development/emerge-ehri/fhir-server
+
+dotnet publish "./src/Microsoft.Health.Fhir.R4.Web/Microsoft.Health.Fhir.R4.Web.csproj" -c Release -o "./target" -r osx-x64
+ 
+rm ./target/*
+cp src/Microsoft.Health.Fhir.R4.Web/target/* ./target
+cp config/nu.appsettings.json ./target/appsettings.json
+
+cd target
+dotnet Microsoft.Health.Fhir.R4.Web.dll
+```
+
+Now when you call [http://localhost:5000/metadata](http://localhost:5000/metadata) from Postman it will return the conformance details.
+
+## Configuration
+
+Next up is following the configuration steps at [https://github.com/emerge-ehri/fhir-implementation/wiki/HAPI-FHIR-Server-Configuration](https://github.com/emerge-ehri/fhir-implementation/wiki/HAPI-FHIR-Server-Configuration).  We will download the `package.tgz` file, unzip it, and place the contents in this project under `config/genomics-reporting-package`.
+
+It looks like we may be able to use the hapi-fhir-cli.  Let's get that built.  Or maybe it'll be easier to just [download it from the releases](https://github.com/jamesagnew/hapi-fhir/releases).  We'll try both and see what works first.
+
+**UPDATE**: Looks like download wins.  It's located and can be run as:
+
+```
+./tools/Northwestern/hapi-fhir-4.1.0-cli/hapi-fhir-cli
+```
+
+**UPDATE 2**: Looks like there's a fix we need not yet in a release.  Back to the build option.
+
+```
+cd ~/Development/emerge-ehri/hapi-fhir/hapi-fhir-cli
+git pull origin master
+mvn clean package
+cp ~/Development/emerge-ehri/hapi-fhir/hapi-fhir-cli/hapi-fhir-cli-app/target/hapi-fhir-cli.jar ~/Development/emerge-ehri/fhir-server/tools/Northwestern/hapi-fhir-4.1.0-cli/hapi-fhir-cli.jar
+```
+
+Commands we ran, with the [full output logged elsewhere](hapi-client-load.txt):
+
+```
+./tools/Northwestern/hapi-fhir-4.1.0-cli/hapi-fhir-cli upload-definitions -t http://localhost:5000/ -v r4
+```
+
+A few other preparatory things.  Looks like we need to download LOINC.  Guessing based off of the names in the commands in the wiki, I think we'll try the [LOINC and RELMA Complete Download File](https://loinc.org/file-access/download-id/8809/).  Note that we downloaded 2.67 because it was released after the HGSC team did this.
+
+```
+./tools/Northwestern/hapi-fhir-4.1.0-cli/hapi-fhir-cli upload-terminology -v r4 -t http://localhost:5000/ -u http://loinc.org -d ./config/Loinc_2.67.zip -d ./config/loincupload.properties
+```
+
+Note that we are missing the loinc.properties file that's referenced in the wiki.  And unfortunately this fails:
+
+```
+(base) lvr491@ ~/Development/emerge-ehri/fhir-server (northwestern) $ ./tools/Northwestern/hapi-fhir-4.1.0-cli/hapi-fhir-cli upload-terminology -v r4 -t http://localhost:5000/ -u http://loinc.org -d ./config/Loinc_2.67.zip
+------------------------------------------------------------
+🔥  HAPI FHIR 4.1.0 - Command Line Tool
+------------------------------------------------------------
+Process ID                      : 86632@FSMC02XC2SPJGH5
+Max configured JVM memory (Xmx) : 8.0GB
+Detected Java version           : 11.0.4
+------------------------------------------------------------
+2020-01-03 11:02:52.111 [main] INFO  c.u.f.c.UploadTerminologyCommand Adding ZIP file: ./config/Loinc_2.67.zip
+2020-01-03 11:02:53.746 [main] INFO  c.u.f.c.UploadTerminologyCommand File size is greater than 10 MB - Going to use a local file reference instead of a direct HTTP transfer. Note that this will only work when executing this command on the same server as the FHIR server itself.
+2020-01-03 11:02:54.492 [main] INFO  c.u.f.c.UploadTerminologyCommand Beginning upload - This may take a while...
+2020-01-03 11:02:55.09 [main] ERROR c.u.f.c.UploadTerminologyCommand Received the following response:
+{
+  "resourceType": "OperationOutcome",
+  "id": "3751eab3-fc15-4659-a94f-23a2790c5a93",
+  "issue": [
+    {
+      "severity": "error",
+      "code": "not-found",
+      "diagnostics": "The requested route was not found."
+    }
+  ]
+}
+2020-01-03 11:02:55.11 [main] ERROR ca.uhn.fhir.cli.App Error during execution: 
+ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException: HTTP 404 Not Found: The requested route was not found.
+	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance0(Native Method)
+	at java.base/jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.java:62)
+	at java.base/jdk.internal.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+	at java.base/java.lang.reflect.Constructor.newInstance(Constructor.java:490)
+	at ca.uhn.fhir.rest.server.exceptions.BaseServerResponseException.newInstance(BaseServerResponseException.java:302)
+	at ca.uhn.fhir.rest.client.impl.BaseClient.invokeClient(BaseClient.java:351)
+	at ca.uhn.fhir.rest.client.impl.GenericClient$BaseClientExecutable.invoke(GenericClient.java:434)
+	at ca.uhn.fhir.rest.client.impl.GenericClient$OperationInternal.execute(GenericClient.java:1173)
+	at ca.uhn.fhir.cli.UploadTerminologyCommand.invokeOperation(UploadTerminologyCommand.java:204)
+	at ca.uhn.fhir.cli.UploadTerminologyCommand.run(UploadTerminologyCommand.java:113)
+	at ca.uhn.fhir.cli.BaseApp.run(BaseApp.java:251)
+	at ca.uhn.fhir.cli.App.main(App.java:43)
+2020-01-03 11:02:55.11 [Thread-0] INFO  ca.uhn.fhir.cli.App HAPI FHIR is shutting down...
+
+```
+
+Maybe try skipping for now?  I guess we can see what happens.
+
+Turns out skipping wasn't the right option, really.  We need this.  After some [discussion with the Baylor team](https://github.com/emerge-ehri/fhir-implementation/issues/37), we got a copy of the loincupload.properties file (which I updated for our version of LOINC):
+
+```
+# This is the version identifier for the AnswerList file
+answerlist.version=2.67
+
+# This is the version identifier for uploaded ConceptMap resources
+conceptmap.version=2.67
+```
+
+This didn't work because the hapi-fhir-cli said it couldn't handle `properties` files.  This required (per an update note above) us to build the cli from source, and that error went away.  We're still getting that 404 error though.  Time to turn on debugging!  This is done in our appsettings.json down in the `Logging` section:
+
+```
+    "Logging": {
+        "IncludeScopes": false,
+        "LogLevel": {
+            "Default": "Debug"
+        },
+```
+
+So now we're seeing a little more information from the server on why a 404 error is coming back:
+
+```
+info: Microsoft.Health.Fhir.Api.Features.ApiNotifications.ApiNotificationMiddleware[0]
+      ApiNotificationMiddleware executed in 00:00:01.5057269.
+dbug: Microsoft.AspNetCore.Server.Kestrel[9]
+      Connection id "0HLSK8KOMRKK5" completed keep alive response.
+info: Microsoft.AspNetCore.Hosting.Internal.WebHost[2]
+      Request finished in 1565.4897ms 200 application/fhir+xml; charset=utf-8
+info: Microsoft.AspNetCore.Hosting.Internal.WebHost[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/CodeSystem/$upload-external-code-system application/fhir+json; charset=UTF-8 665
+dbug: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[1]
+      POST requests are not supported
+dbug: Microsoft.AspNetCore.Routing.Tree.TreeRouter[1]
+      Request successfully matched the route with name '(null)' and template '{typeParameter:fhirResource}/{idParameter}'
+dbug: Microsoft.AspNetCore.Mvc.Internal.ActionSelector[2]
+      Action 'Microsoft.Health.Fhir.Api.Controllers.FhirController.Update (Microsoft.Health.Fhir.R4.Api)' with id '4ff61d52-ddc5-4d26-a6ac-89e5e7812f23' did not match the constraint 'Microsoft.AspNetCore.Mvc.Internal.HttpMethodActionConstraint'
+dbug: Microsoft.AspNetCore.Mvc.Internal.ActionSelector[2]
+      Action 'Microsoft.Health.Fhir.Api.Controllers.FhirController.Read (Microsoft.Health.Fhir.R4.Api)' with id 'c93d7dab-3329-43eb-b7da-03adfbb8b6eb' did not match the constraint 'Microsoft.AspNetCore.Mvc.Internal.HttpMethodActionConstraint'
+dbug: Microsoft.AspNetCore.Mvc.Internal.ActionSelector[2]
+      Action 'Microsoft.Health.Fhir.Api.Controllers.FhirController.Delete (Microsoft.Health.Fhir.R4.Api)' with id 'a58dcdd5-3404-4193-9148-14aa0e523a33' did not match the constraint 'Microsoft.AspNetCore.Mvc.Internal.HttpMethodActionConstraint'
+dbug: Microsoft.AspNetCore.Mvc.Internal.ActionSelector[2]
+      Action 'Microsoft.Health.Fhir.Api.Controllers.FhirController.Patch (Microsoft.Health.Fhir.R4.Api)' with id '94bdfb51-9970-4f5c-b93c-f70e818cf08e' did not match the constraint 'Microsoft.AspNetCore.Mvc.Internal.HttpMethodActionConstraint'
+dbug: Microsoft.AspNetCore.Mvc.Internal.MvcAttributeRouteHandler[3]
+      No actions matched the current request. Route values: typeParameter=CodeSystem, idParameter=$upload-external-code-system
+dbug: Microsoft.AspNetCore.Builder.RouterMiddleware[1]
+      Request did not match any routes
+```
+
+Let's get past 'n-of-1' and see if the same thing happens with SNOMED CT.  
+I am looking at [this SNOMED-CT download site](https://www.nlm.nih.gov/healthit/snomedct/us_edition.html).
+
+```
+./tools/Northwestern/hapi-fhir-4.1.0-cli/hapi-fhir-cli upload-terminology -v r4 -t http://localhost:5000/ -u http://snomed.info/sct -d ./config/SnomedCT_USEditionRF2_PRODUCTION_20190901T120000Z.zip
+```
+
+Okay - same type of error, so it's not tied to LOINC (not that we expected it to be).  Next up, we'll try the hosted Azure option to see if it works or not.
+
+Deploying from [the FHIR Server template to Azure](https://github.com/microsoft/fhir-server/blob/master/docs/DefaultDeployment.md#deploying-the-fhir-server-template), we end up getting the exact same results unfortunately.  I've [submited a GitHub issue](https://github.com/microsoft/fhir-server/issues/809) to hopefully get additional help.
+
+Is [this sufficient for SNOMED-CT](https://www.hl7.org/fhir/codesystem-snomedct.json)?  Seems like it's not enough.  We're able to POST to /ConceptSet to get it loaded at least.
