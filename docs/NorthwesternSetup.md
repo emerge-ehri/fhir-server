@@ -297,3 +297,34 @@ Okay - same type of error, so it's not tied to LOINC (not that we expected it to
 Deploying from [the FHIR Server template to Azure](https://github.com/microsoft/fhir-server/blob/master/docs/DefaultDeployment.md#deploying-the-fhir-server-template), we end up getting the exact same results unfortunately.  I've [submited a GitHub issue](https://github.com/microsoft/fhir-server/issues/809) to hopefully get additional help.
 
 Is [this sufficient for SNOMED-CT](https://www.hl7.org/fhir/codesystem-snomedct.json)?  Seems like it's not enough.  We're able to POST to /ConceptSet to get it loaded at least.
+
+Okay, the fhir-server group at Microsoft responded quickly and kindly let us know that this isn't supported, but sounds like a future roadmap item.  It makes sense that it's not - what HAPI FHIR has done isn't actually a standard capability that needs to be supported.  It was a nice to have that HAPI built in.
+
+After discussion with our eMERGE team, we're going to look at using external FHIR terminology servers for LOINC and SNOMED-CT if possible.  We will come back to that.  For now, here are two links to remember:
+
+* LOINC - [https://loinc.org/fhir/](https://loinc.org/fhir/)
+* SNOMED - [https://confluence.ihtsdotools.org/display/FHIR/FHIR+Terminology+Services+and+Resources](https://confluence.ihtsdotools.org/display/FHIR/FHIR+Terminology+Services+and+Resources)
+
+## Loading patient data
+
+Let's get on to what happens if the data gets loaded.  This lets us test the "what happens if we ignore the steps to load terminologies" question.
+
+From Postman, we are going to `POST` to the Patient URL at [http://localhost:5000/Patient](http://localhost:5000/Patient).  We will set `Content-Type` in the header to `application/fhir+json`.  For the body, we will [get the raw JSON of a test patient](https://www.hl7.org/fhir/patient-example.json).  We submit and get back a response.  When I `GET` from [http://localhost:5000/Patient](http://localhost:5000/Patient), I can see my new patient. **IT WORKS!!**
+
+The question is about validation now - how do we do it? After some reading, I tried a `POST` to [http://localhost:5000/Patient/$validate](http://localhost:5000/Patient/$validate)
+
+Not sure if [this issue is relevant](https://github.com/microsoft/fhir-server/issues/777), but that returns:
+
+```
+{
+    "resourceType": "OperationOutcome",
+    "id": "ce8fe5aa-9d7a-4221-bec0-f6f9fad82547",
+    "issue": [
+        {
+            "severity": "error",
+            "code": "not-found",
+            "diagnostics": "The requested route was not found."
+        }
+    ]
+}
+```
