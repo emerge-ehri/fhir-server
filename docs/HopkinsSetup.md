@@ -2,6 +2,7 @@
 
 ## Considerations
 * [Pricing to use Azure API for FHIR](https://azure.microsoft.com/en-us/pricing/details/azure-api-for-fhir/)
+* [Cosmos Capacity Calculator](https://cosmos.azure.com/capacitycalculator/)
 
 ## Getting started
 * Get an Azure subscription to install managed FHIR server
