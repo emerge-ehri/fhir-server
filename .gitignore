@@ -293,3 +293,5 @@ __pycache__/
 
 # IdentityServer workspace
 tempkey.rsa
+
+tools/Northwestern/hapi-fhir*
