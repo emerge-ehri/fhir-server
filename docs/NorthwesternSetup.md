@@ -309,7 +309,9 @@ After discussion with our eMERGE team, we're going to look at using external FHI
 
 Let's get on to what happens if the data gets loaded.  This lets us test the "what happens if we ignore the steps to load terminologies" question.
 
-From Postman, we are going to `POST` to the Patient URL at [http://localhost:5000/Patient](http://localhost:5000/Patient).  We will set `Content-Type` in the header to `application/fhir+json`.  For the body, we will [get the raw JSON of a test patient](https://www.hl7.org/fhir/patient-example.json).  We submit and get back a response.  When I `GET` from [http://localhost:5000/Patient](http://localhost:5000/Patient), I can see my new patient. **IT WORKS!!**
+We'll start from a brand new, totally clean instance of the server.  This means resettting the database and reloading everything.  Then, from Postman we `GET` from [http://localhost:5000/Patient](http://localhost:5000/Patient) to make sure no patients come back.  Yes - confirmed this is the case.
+
+Now from Postman, we are going to `POST` to the Patient URL at [http://localhost:5000/Patient](http://localhost:5000/Patient).  We will set `Content-Type` in the header to `application/fhir+json`.  For the body, we will [get the raw JSON of a test patient](https://www.hl7.org/fhir/patient-example.json).  We submit and get back a response.  When I `GET` from [http://localhost:5000/Patient](http://localhost:5000/Patient), I can see my new patient. **IT WORKS!!**
 
 The question is about validation now - how do we do it? After some reading, I tried a `POST` to [http://localhost:5000/Patient/$validate](http://localhost:5000/Patient/$validate)
 
@@ -328,3 +330,306 @@ Not sure if [this issue is relevant](https://github.com/microsoft/fhir-server/is
     ]
 }
 ```
+
+This may actually be the case.  When we look at the conformance statement for the server, it's not listing a `validate` interaction:
+
+```
+{
+"type": "Patient",
+"interaction": [
+    {
+        "code": "create"
+    },
+    {
+        "code": "read"
+    },
+    {
+        "code": "vread"
+    },
+    {
+        "code": "history-type"
+    },
+    {
+        "code": "history-instance"
+    },
+    {
+        "code": "update"
+    },
+    {
+        "code": "delete"
+    },
+    {
+        "code": "search-type"
+    }
+],
+```
+
+I noticed though that the [HAPI FHIR reference server](https://fhirtest.uhn.ca/conformance?serverId=home_r4&pretty=true) doesn't list this either, so maybe that's a false lead?  We do know there is a validate command that you can get [from the Patient resource tab](https://fhirtest.uhn.ca/resource?serverId=home_r4&pretty=true&resource=Patient).  Regardless, I did come across [another issue / pull request](https://github.com/microsoft/fhir-server/pull/793) that's looking to add support for `$validate`.  I think that's a good indication it's not supported as of yet.
+
+That PR indicates we can 'validate' by submitting, so maybe that's the best we can do for now.  Assume that if it gets stored, it's valid.
+
+Let's try now with a Bundle.  We have a test bundle from HGSC that we'll fire off.  Of course, a quick `GET` to [http://localhost:5000/Bundle](http://localhost:5000/Bundle) confirms there's nothing there.  We do our `POST` to [http://localhost:5000/Bundle](http://localhost:5000/Bundle) and we get back a response.  This looks like a good first start.  When we `GET` the list of bundles again, we can see the one we added.  Looks like we're able to file results as Bundles.  However, we don't see it in the list of patients.  Just to be safe, we're going to reset the database and just load the bundle.
+
+When we do, here's the log information:
+
+```
+info: Microsoft.AspNetCore.Hosting.Internal.WebHost[1]
+      Request starting HTTP/1.1 POST http://localhost:5000/Bundle application/fhir+json 143310
+dbug: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[1]
+      POST requests are not supported
+dbug: Microsoft.AspNetCore.Routing.Tree.TreeRouter[1]
+      Request successfully matched the route with name '(null)' and template '{typeParameter:fhirResource}'
+dbug: Microsoft.AspNetCore.Mvc.Internal.ActionSelector[2]
+      Action 'Microsoft.Health.Fhir.Api.Controllers.FhirController.ConditionalCreate (Microsoft.Health.Fhir.R4.Api)' with id '552ec694-3942-4abf-bf7d-33d39d1d5a70' did not match the constraint 'Microsoft.Health.Fhir.Api.Features.ActionConstraints.ConditionalConstraintAttribute'
+dbug: Microsoft.AspNetCore.Mvc.Internal.ActionSelector[2]
+      Action 'Microsoft.Health.Fhir.Api.Controllers.FhirController.ConditionalUpdate (Microsoft.Health.Fhir.R4.Api)' with id '0c0dd708-321f-47f3-8c03-2648e41d746c' did not match the constraint 'Microsoft.AspNetCore.Mvc.Internal.HttpMethodActionConstraint'
+dbug: Microsoft.AspNetCore.Mvc.Internal.ActionSelector[2]
+      Action 'Microsoft.Health.Fhir.Api.Controllers.FhirController.SearchByResourceType (Microsoft.Health.Fhir.R4.Api)' with id 'e1733b1f-93c6-4f43-8635-9495a66e7a0a' did not match the constraint 'Microsoft.AspNetCore.Mvc.Internal.HttpMethodActionConstraint'
+info: Microsoft.AspNetCore.Mvc.Internal.ControllerActionInvoker[3]
+      Route matched with {action = "Create", controller = "Fhir"}. Executing controller action with signature System.Threading.Tasks.Task`1[Microsoft.AspNetCore.Mvc.IActionResult] Create(Hl7.Fhir.Model.Resource) on controller Microsoft.Health.Fhir.Api.Controllers.FhirController (Microsoft.Health.Fhir.R4.Api).
+dbug: Microsoft.AspNetCore.Mvc.Internal.ControllerActionInvoker[1]
+      Execution plan of authorization filters (in the following order): Microsoft.AspNetCore.Mvc.Authorization.AuthorizeFilter, Microsoft.AspNetCore.Mvc.Authorization.AuthorizeFilter
+dbug: Microsoft.AspNetCore.Mvc.Internal.ControllerActionInvoker[1]
+      Execution plan of resource filters (in the following order): Microsoft.AspNetCore.Mvc.ViewFeatures.Internal.SaveTempDataFilter
+dbug: Microsoft.AspNetCore.Mvc.Internal.ControllerActionInvoker[1]
+      Execution plan of action filters (in the following order): Microsoft.AspNetCore.Mvc.Internal.ControllerActionFilter (Order: -2147483648), Microsoft.Health.Fhir.Api.Features.Filters.FhirRequestContextRouteDataPopulatingFilterAttribute (Order: 0), Microsoft.Health.Fhir.Api.Features.Audit.AuditLoggingFilterAttribute (Order: 0), Microsoft.Health.Fhir.Api.Features.Filters.OperationOutcomeExceptionFilterAttribute (Order: 0), Microsoft.Health.Fhir.Api.Features.Filters.ValidateContentTypeFilterAttribute (Order: 0), Microsoft.Health.Fhir.Api.Features.Filters.ValidateResourceTypeFilterAttribute (Order: 0), Microsoft.Health.Fhir.Api.Features.Filters.ValidateModelStateAttribute (Order: 0)
+dbug: Microsoft.AspNetCore.Mvc.Internal.ControllerActionInvoker[1]
+      Execution plan of exception filters (in the following order): None
+dbug: Microsoft.AspNetCore.Mvc.Internal.ControllerActionInvoker[1]
+      Execution plan of result filters (in the following order): Microsoft.AspNetCore.Mvc.ViewFeatures.Internal.SaveTempDataFilter, Microsoft.Health.Fhir.Api.Features.Filters.FhirRequestContextRouteDataPopulatingFilterAttribute (Order: 0), Microsoft.Health.Fhir.Api.Features.Audit.AuditLoggingFilterAttribute (Order: 0), Microsoft.Health.Fhir.Api.Features.Filters.OperationOutcomeExceptionFilterAttribute (Order: 0), Microsoft.Health.Fhir.Api.Features.Filters.ValidateContentTypeFilterAttribute (Order: 0), Microsoft.Health.Fhir.Api.Features.Filters.ValidateResourceTypeFilterAttribute (Order: 0), Microsoft.Health.Fhir.Api.Features.Filters.ValidateModelStateAttribute (Order: 0)
+info: Microsoft.AspNetCore.Authorization.DefaultAuthorizationService[1]
+      Authorization was successful.
+info: Microsoft.AspNetCore.Authorization.DefaultAuthorizationService[1]
+      Authorization was successful.
+dbug: Microsoft.AspNetCore.Mvc.ModelBinding.ParameterBinder[22]
+      Attempting to bind parameter 'resource' of type 'Hl7.Fhir.Model.Resource' ...
+dbug: Microsoft.AspNetCore.Mvc.ModelBinding.Binders.BodyModelBinder[24]
+      Attempting to bind model of type 'Hl7.Fhir.Model.Resource' using the name '' in request data ...
+dbug: Microsoft.AspNetCore.Mvc.ModelBinding.Binders.BodyModelBinder[1]
+      Selected input formatter 'Microsoft.Health.Fhir.Api.Features.Formatters.FhirJsonInputFormatter' for content type 'application/fhir+json'.
+dbug: Microsoft.AspNetCore.Server.Kestrel[25]
+      Connection id "0HLT3AFJHLOA6", Request id "0HLT3AFJHLOA6:00000003": started reading request body.
+dbug: Microsoft.AspNetCore.Mvc.ModelBinding.Binders.BodyModelBinder[25]
+      Done attempting to bind model of type 'Hl7.Fhir.Model.Resource' using the name ''.
+dbug: Microsoft.AspNetCore.Mvc.ModelBinding.ParameterBinder[23]
+      Done attempting to bind parameter 'resource' of type 'Hl7.Fhir.Model.Resource'.
+info: Microsoft.Health.Fhir.Api.Features.Audit.IAuditLogger[0]
+      ActionType: Executing
+      EventType: AuditEvent
+      Audience: (null)
+      Authority: (null)
+      ResourceType: (null)
+      RequestUri: http://localhost:5000/Bundle
+      Action: create
+      StatusCode: (null)
+      CorrelationId: 1103aa80-3637-480e-a898-bb3d7e2fa1e5
+      Claims: 
+info: Microsoft.AspNetCore.Mvc.Internal.ControllerActionInvoker[1]
+      Executing action method Microsoft.Health.Fhir.Api.Controllers.FhirController.Create (Microsoft.Health.Fhir.R4.Api) - Validation state: Valid
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.4168135.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0005058.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002460.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0158580.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002378.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001471.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001984.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001579.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001415.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001473.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002930.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002227.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002353.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002444.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002521.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001781.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002220.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002404.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001614.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001530.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001487.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001486.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001462.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001858.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001535.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001310.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001900.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002031.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001417.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002090.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002725.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001586.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001418.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001882.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001560.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001368.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001411.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001584.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001246.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001390.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001496.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002990.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002020.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002105.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001674.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0002327.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001690.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001442.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001432.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001595.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001384.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001385.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001382.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001379.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001393.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001400.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001152.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001159.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001155.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001167.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001345.
+info: Microsoft.Health.Fhir.Core.Features.Validation.Narratives.NarrativeHtmlSanitizer[0]
+      NarrativeHtmlSanitizer.Validate executed in 00:00:00.0001860.
+dbug: Microsoft.Health.Fhir.Core.Features.Search.SearchIndexer[0]
+      The FHIR element 'id' will be converted using 'Microsoft.Health.Fhir.Core.Features.Search.Converters.IdToTokenSearchValueTypeConverter'.
+dbug: Microsoft.Health.Fhir.Core.Features.Search.SearchIndexer[0]
+      The FHIR element 'instant' will be converted using 'Microsoft.Health.Fhir.Core.Features.Search.Converters.InstantToDateTimeSearchValueTypeConverter'.
+dbug: Microsoft.Health.Fhir.Core.Features.Search.SearchIndexer[0]
+      The FHIR element 'code' will be converted using 'Microsoft.Health.Fhir.Core.Features.Search.Converters.CodeOfTToTokenSearchValueTypeConverter'.
+info: Microsoft.Health.Fhir.SqlServer.Features.Storage.SqlServerFhirModel[0]
+      Cache miss for string ID on dbo.System
+info: Microsoft.AspNetCore.Mvc.Internal.ControllerActionInvoker[2]
+      Executed action method Microsoft.Health.Fhir.Api.Controllers.FhirController.Create (Microsoft.Health.Fhir.R4.Api), returned result Microsoft.Health.Fhir.Api.Features.ActionResults.FhirResult in 662.8601ms.
+dbug: Microsoft.AspNetCore.Mvc.Infrastructure.DefaultOutputFormatterSelector[11]
+      List of registered output formatters, in the following order: Microsoft.Health.Fhir.Api.Features.Formatters.FhirJsonOutputFormatter, Microsoft.Health.Fhir.Api.Features.Formatters.FhirXmlOutputFormatter, Microsoft.Health.Fhir.Api.Features.Formatters.NonFhirResourceXmlOutputFormatter, Microsoft.Health.Fhir.Api.Features.Formatters.HtmlOutputFormatter, Microsoft.AspNetCore.Mvc.Formatters.HttpNoContentOutputFormatter, Microsoft.AspNetCore.Mvc.Formatters.StringOutputFormatter, Microsoft.AspNetCore.Mvc.Formatters.StreamOutputFormatter, Microsoft.AspNetCore.Mvc.Formatters.JsonOutputFormatter
+dbug: Microsoft.AspNetCore.Mvc.Infrastructure.DefaultOutputFormatterSelector[6]
+      Attempting to select an output formatter based on Accept header '*/*'.
+dbug: Microsoft.AspNetCore.Mvc.Infrastructure.DefaultOutputFormatterSelector[2]
+      Selected output formatter 'Microsoft.Health.Fhir.Api.Features.Formatters.FhirJsonOutputFormatter' and content type 'application/fhir+json' to write the response.
+info: Microsoft.AspNetCore.Mvc.Infrastructure.ObjectResultExecutor[1]
+      Executing ObjectResult, writing value of type 'Hl7.Fhir.Model.Bundle'.
+info: Microsoft.Health.Fhir.Api.Features.Audit.IAuditLogger[0]
+      ActionType: Executed
+      EventType: AuditEvent
+      Audience: (null)
+      Authority: (null)
+      ResourceType: Bundle
+      RequestUri: http://localhost:5000/Bundle
+      Action: create
+      StatusCode: Created
+      CorrelationId: 1103aa80-3637-480e-a898-bb3d7e2fa1e5
+      Claims: 
+info: Microsoft.AspNetCore.Mvc.Internal.ControllerActionInvoker[2]
+      Executed action Microsoft.Health.Fhir.Api.Controllers.FhirController.Create (Microsoft.Health.Fhir.R4.Api) in 920.2426ms
+info: Microsoft.Health.Fhir.Api.Features.ApiNotifications.ApiNotificationMiddleware[0]
+      ApiNotificationMiddleware executed in 00:00:00.9246478.
+dbug: Microsoft.AspNetCore.Server.Kestrel[9]
+      Connection id "0HLT3AFJHLOA6" completed keep alive response.
+info: Microsoft.AspNetCore.Hosting.Internal.WebHost[2]
+      Request finished in 924.7453ms 201 application/fhir+json; charset=utf-8
+dbug: Microsoft.AspNetCore.Server.Kestrel[26]
+      Connection id "0HLT3AFJHLOA6", Request id "0HLT3AFJHLOA6:00000003": done reading request body.
+
+```
+
+
+We'll try doing this with an [example bundle from the FHIR website](https://www.hl7.org/fhir/bundle-transaction.json.html) as well.  It also gets submitted, but when I search for patients I don't see it listed.  It's showing up as a Bundle result though.
+
+Doing some more searching it [sounds like this should be supported](https://github.com/microsoft/fhir-server/issues/237).  One thing to check was the app setttings about enabling this.  So in our appsettings.json we have to make sure this is enabled:
+
+```
+"CoreFeatures": {
+    "SupportsBatch": true,
+    "SupportsTransaction": true
+},
+```
+
+I tested again, and still not working.  So, the bundle exists, but it's not creating the embedded resources.
+
+_....Some time passes...._
+
+Here's the problem - [I'm apparently not smart and couldn't read the spec, misread the spec, something](https://github.com/microsoft/fhir-server/issues/866#issuecomment-580583313).  It turns out that the whole issue was me posting to `http://localhost:5000//Bundle`, when instead I needed to post to `http://localhost:5000/`.  As soon as I do that, I get back a much better response with every data element in the bundle processed correctly.  All of the resource endpoints are now returning the information that I would expect to retrieve.
+
+### Getting data back out
+
+So now we've got it in, and now we can do the typical FHIR searches against the resources.  We can pull a patient using a canonical identifier the system assigned:
+
+`http://localhost:5000/Patient?_id=65092887-1fef-4c29-9107-bc2358aaf88e`
+
+Or we can search by an identifier assigned to the patient by the lab (this will be more meaningful to us);
+
+`http://localhost:5000/Patient?identifier=11429b73-5f5c-4e24-8cfe-82c7e17a7aea`
+
+We can then (following the [FHIR search documentation](https://www.hl7.org/fhir/search.html), since I obviously need to be reading the documentation).
+
+I can get all of the Observation resources back for a single patient, but that of course is a little messy because the Observations conform to different profiles so it's more of a mixed bag.
+
+`http://localhost:5000/Observation?patient:Patient.identifier=11429b73-5f5c-4e24-8cfe-82c7e17a7aea`
+
+We started with this to constrain by profile, but it didn't work.  Let's figure out why that is.
+
+`http://localhost:5000/Observation?_profile=http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/medication-metabolism`
+
+Interesting - if we use the full search item path (`Resource.meta.profile`) we get back data, but it's kind of a false assurance - we're getting back everything still.  So this **isn't** a valid search, even though it's syntactically correct.
+
+`http://localhost:5000/Observation?patient:Patient.identifier=11429b73-5f5c-4e24-8cfe-82c7e17a7aea&Resource.meta.profile=http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/medication-metabolism`
