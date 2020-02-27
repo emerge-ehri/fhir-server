@@ -633,3 +633,5 @@ We started with this to constrain by profile, but it didn't work.  Let's figure 
 Interesting - if we use the full search item path (`Resource.meta.profile`) we get back data, but it's kind of a false assurance - we're getting back everything still.  So this **isn't** a valid search, even though it's syntactically correct.
 
 `http://localhost:5000/Observation?patient:Patient.identifier=11429b73-5f5c-4e24-8cfe-82c7e17a7aea&Resource.meta.profile=http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/medication-metabolism`
+
+Doing a little more digging, it looks like this [isn't supported by MS fhir-server](https://github.com/microsoft/fhir-server/issues/880).  They have removed it from the conformance statement, so we shouldn't expect it to work.
