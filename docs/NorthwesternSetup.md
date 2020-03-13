@@ -635,3 +635,8 @@ Interesting - if we use the full search item path (`Resource.meta.profile`) we g
 `http://localhost:5000/Observation?patient:Patient.identifier=11429b73-5f5c-4e24-8cfe-82c7e17a7aea&Resource.meta.profile=http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/medication-metabolism`
 
 Doing a little more digging, it looks like this [isn't supported by MS fhir-server](https://github.com/microsoft/fhir-server/issues/880).  They have removed it from the conformance statement, so we shouldn't expect it to work.
+
+A little more information about the MS FHIR Server:
+
+* [MS Supported FHIR Features](https://docs.microsoft.com/en-us/azure/healthcare-apis/fhir-features-supported)
+* [FHIR Importer utility](https://github.com/microsoft/fhir-server-samples/tree/master/src/FhirImporter)
