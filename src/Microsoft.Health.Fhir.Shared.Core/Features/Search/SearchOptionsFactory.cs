@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using EnsureThat;
@@ -31,18 +32,18 @@ namespace Microsoft.Health.Fhir.Core.Features.Search
 
         public SearchOptionsFactory(
             IExpressionParser expressionParser,
-            ISearchParameterDefinitionManager searchParameterDefinitionManager,
+            SearchableSearchParameterDefinitionManagerResolver searchParameterDefinitionManagerResolver,
             ILogger<SearchOptionsFactory> logger)
         {
             EnsureArg.IsNotNull(expressionParser, nameof(expressionParser));
-            EnsureArg.IsNotNull(searchParameterDefinitionManager, nameof(searchParameterDefinitionManager));
+            EnsureArg.IsNotNull(searchParameterDefinitionManagerResolver, nameof(searchParameterDefinitionManagerResolver));
             EnsureArg.IsNotNull(logger, nameof(logger));
 
             _expressionParser = expressionParser;
-            _searchParameterDefinitionManager = searchParameterDefinitionManager;
+            _searchParameterDefinitionManager = searchParameterDefinitionManagerResolver();
             _logger = logger;
 
-            _resourceTypeSearchParameter = searchParameterDefinitionManager.GetSearchParameter(ResourceType.Resource.ToString(), SearchParameterNames.ResourceType);
+            _resourceTypeSearchParameter = _searchParameterDefinitionManager.GetSearchParameter(ResourceType.Resource.ToString(), SearchParameterNames.ResourceType);
         }
 
         public SearchOptions Create(string resourceType, IReadOnlyList<Tuple<string, string>> queryParameters)
@@ -92,19 +93,21 @@ namespace Microsoft.Health.Fhir.Core.Features.Search
                 }
                 else if (string.Compare(query.Item1, KnownQueryParameterNames.Total, StringComparison.OrdinalIgnoreCase) == 0)
                 {
+                    // Estimate is not yet supported.
+                    var supportedTotalTypes = new string($"'{TotalType.Accurate}', '{TotalType.None}'").ToLower(CultureInfo.CurrentCulture);
+
                     if (Enum.TryParse<TotalType>(query.Item2, true, out var totalType))
                     {
-                        // Estimate is not yet supported.
                         if (totalType == TotalType.Estimate)
                         {
-                            throw new SearchOperationNotSupportedException(Core.Resources.UnsupportedTotalParameter);
+                            throw new SearchOperationNotSupportedException(string.Format(Core.Resources.UnsupportedTotalParameter, query.Item2, supportedTotalTypes));
                         }
 
                         searchOptions.IncludeTotal = totalType;
                     }
                     else
                     {
-                        throw new BadRequestException(Core.Resources.UnsupportedTotalParameter);
+                        throw new BadRequestException(string.Format(Core.Resources.InvalidTotalParameter, query.Item2, supportedTotalTypes));
                     }
                 }
                 else
@@ -221,7 +224,7 @@ namespace Microsoft.Health.Fhir.Core.Features.Search
                     }
                     catch (SearchParameterNotSupportedException)
                     {
-                        (unsupportedSortings ?? (unsupportedSortings = new List<(string parameterName, string reason)>())).Add((sorting.Item1, string.Format(Core.Resources.SearchParameterNotSupported, sorting.Item1, resourceType)));
+                        (unsupportedSortings ??= new List<(string parameterName, string reason)>()).Add((sorting.Item1, string.Format(Core.Resources.SearchParameterNotSupported, sorting.Item1, resourceType)));
                     }
                 }
 

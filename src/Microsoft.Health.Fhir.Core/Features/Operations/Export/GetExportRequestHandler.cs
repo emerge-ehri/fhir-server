@@ -36,7 +36,7 @@ namespace Microsoft.Health.Fhir.Core.Features.Operations.Export
         {
             EnsureArg.IsNotNull(request, nameof(request));
 
-            if (_authorizationService.CheckAccess(DataActions.Export) != DataActions.Export)
+            if (await _authorizationService.CheckAccess(DataActions.Export) != DataActions.Export)
             {
                 throw new UnauthorizedFhirActionException();
             }
@@ -52,8 +52,8 @@ namespace Microsoft.Health.Fhir.Core.Features.Operations.Export
                     outcome.JobRecord.QueuedTime,
                     outcome.JobRecord.RequestUri,
                     requiresAccessToken: false,
-                    outcome.JobRecord.Output.Values.OrderBy(x => x.Type, StringComparer.Ordinal).ToList(),
-                    outcome.JobRecord.Error);
+                    outcome.JobRecord.Output.Values.Select(x => x.ToExportOutputResponse()).OrderBy(x => x.Type, StringComparer.Ordinal).ToList(),
+                    outcome.JobRecord.Error.Select(x => x.ToExportOutputResponse()).ToList());
 
                 exportResponse = new GetExportResponse(HttpStatusCode.OK, jobResult);
             }
