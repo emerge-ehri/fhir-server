@@ -58,13 +58,13 @@ Looks like the target runtime was part of the issue.  We're getting a little bit
 
 ```
 Unhandled Exception: System.NullReferenceException: Object reference not set to an instance of an object.
-   at Microsoft.Health.Fhir.Web.Startup.ConfigureServices(IServiceCollection services) in /Users/lvr491/Development/emerge-ehri/fhir-server/src/Microsoft.Health.Fhir.Shared.Web/Startup.cs:line 36
+   at Microsoft.Health.Fhir.Web.Startup.ConfigureServices(IServiceCollection services) in /Users/luke/Development/emerge-ehri/fhir-server/src/Microsoft.Health.Fhir.Shared.Web/Startup.cs:line 36
 --- End of stack trace from previous location where exception was thrown ---
    at Microsoft.AspNetCore.Hosting.ConventionBasedStartup.ConfigureServices(IServiceCollection services)
    at Microsoft.AspNetCore.Hosting.Internal.WebHost.EnsureApplicationServices()
    at Microsoft.AspNetCore.Hosting.Internal.WebHost.Initialize()
    at Microsoft.AspNetCore.Hosting.WebHostBuilder.Build()
-   at Microsoft.Health.Fhir.Web.Program.Main(String[] args) in /Users/lvr491/Development/emerge-ehri/fhir-server/src/Microsoft.Health.Fhir.Shared.Web/Program.cs:line 19
+   at Microsoft.Health.Fhir.Web.Program.Main(String[] args) in /Users/luke/Development/emerge-ehri/fhir-server/src/Microsoft.Health.Fhir.Shared.Web/Program.cs:line 19
 Abort trap: 6
 ```
 
@@ -757,3 +757,16 @@ Looking at the [`PlanDefinition` specification](https://hl7.org/fhir/plandefinit
 There are [several unsupported search fields](https://github.com/microsoft/fhir-server/blob/deaa3909e06fa863619d449158588d4802019372/src/Microsoft.Health.Fhir.R4.Core/Features/Definition/unsupported-search-parameters.json) in the MS FHIR Server, but it seems like these would be supported.  However, I'm not sure how this is currently handled within HAPI/SMILE CDR, and if this is a limitation of the MS implementation.
 
 The first thing will be to pull the latest code and see if this has been fixed already.
+
+Off the bat, looks like we have to update our framework versions:
+
+```
+  The specified framework can be found at:
+    - https://aka.ms/dotnet-core-applaunch?framework=Microsoft.NETCore.App&framework_version=3.1.3&arch=x64&rid=osx.10.13-x64
+/Users/luke/.nuget/packages/microsoft.health.extensions.buildtimecodegenerator/1.0.0-master-20200416-1/build/netstandard2.0/Microsoft.Health.Extensions.BuildTimeCodeGenerator.targets(22,9): error MSB3073: The command "dotnet "/Users/luke/.nuget/packages/microsoft.health.extensions.buildtimecodegenerator/1.0.0-master-20200416-1/build/netstandard2.0/../../tools/netcoreapp3.1/Microsoft.Health.Extensions.BuildTimeCodeGenerator.dll" --generator-name "SqlModelGenerator" --output-file "/Users/luke/Development/emerge-ehri/fhir-server/src/Microsoft.Health.Fhir.SqlServer/Features/Schema/Model/VLatest.Generated.cs" --namespace "Microsoft.Health.Fhir.SqlServer.Features.Schema.Model" "/Users/luke/Development/emerge-ehri/fhir-server/src/Microsoft.Health.Fhir.SqlServer/Features/Schema/Migrations/2.sql"" exited with code 150. [/Users/luke/Development/emerge-ehri/fhir-server/src/Microsoft.Health.Fhir.SqlServer/Microsoft.Health.Fhir.SqlServer.csproj]
+  Microsoft.Health.Fhir.R4.Api -> /Users/luke/Development/emerge-ehri/fhir-server/src/Microsoft.Health.Fhir.R4.Api/bin/Release/netcoreapp3.1/Microsoft.Health.Fhir.R4.Api.dll
+```
+
+Ended up [finding the right installer here](https://dotnet.microsoft.com/download/dotnet-core/thank-you/sdk-3.1.201-macos-x64-installer) for v3.1.3, and installed it.
+
+This time, the build succeeded!  I'm able to go through and run our typical setup scripts to initialize databases and local FHIR setup.  Unfortunately it doesn't appear to make a difference in the implementation, as everything still works the same.
