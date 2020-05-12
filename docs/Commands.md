@@ -1,9 +1,11 @@
 # fhir-server Commands
 
-Start up
+## Start up
 
 ```
 docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=tMk%e9?FsE7=tsSz' -p 1433:1433 -d mcr.microsoft.com/mssql/server:2017-CU8-ubuntu
+
+docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=tMk%e9?FsE7=tsSz' -p 1434:1433 -d mcr.microsoft.com/mssql/server:2017-CU8-ubuntu
 
 cd ~/Development/emerge-ehri/fhir-server
 
@@ -24,12 +26,19 @@ cd ~/Development/emerge-ehri/fhir-server
 
 
 
-Shut down
+## Shut down
 
-* Kill the dotnet process running
+1. Kill the dotnet process running
+2. Stop the running SQL Server Docker container
+
+	```
+	docker ps  # shows running containers, get ID
+	docker stop <ID>  # ID is like b1e226adc4e0
+	docker ps  # Confirm it shut down
+	```
+
+For better (more permanent cleanup) of a stopped docker container, you can use:
 
 ```
-docker ps  # shows running containers, get ID
-docker stop <ID>  # ID is like b1e226adc4e0
-docker ps  # Confirm it shut down
+docker rm $(docker ps -a -q)
 ```

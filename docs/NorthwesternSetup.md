@@ -640,3 +640,120 @@ A little more information about the MS FHIR Server:
 
 * [MS Supported FHIR Features](https://docs.microsoft.com/en-us/azure/healthcare-apis/fhir-features-supported)
 * [FHIR Importer utility](https://github.com/microsoft/fhir-server-samples/tree/master/src/FhirImporter)
+
+
+## Loading the Data
+
+### Pulling FHIR Bundles from AWS S3
+
+We are pulling data from AWS S3 buckets.  To automate the process, we are going to script a program to pull down the files in our directory.
+
+From our command line program, we [followed the AWS setup instructions for adding assemblies](https://docs.aws.amazon.com/sdk-for-net/v3/developer-guide/net-dg-install-assemblies.html).
+
+SCRATCH THAT!
+
+Alright, we're bailing on creating our own C# code to pull from S3 because there is a super nice CLI already available.  We can do this with just 2 commands:
+
+```
+aws s3 sync s3://devemergepilot/NU/bundle/negative .
+aws s3 sync s3://devemergepilot/NU/bundle/positive .
+```
+
+Or for production (PHI) data:
+```
+aws s3 sync s3://prodemergepilot/bundle/NU/negative .
+aws s3 sync s3://prodemergepilot/bundle/NU/positive .
+```
+
+I probably could figure out how to make that one command, but it's easy, it works, and it puts everything in the same folder for me (I don't want - for reason - negative and positive separated).
+
+### Creating an AGS Database for Testing
+For the AGS, we are going to also create a local instance in a SQL Server Docker container just to help expedite testing.  We will use the same dummy password, and have this run on port 1434:
+
+```
+docker run -e 'ACCEPT_EULA=Y' -e 'SA_PASSWORD=tMk%e9?FsE7=tsSz' -p 1434:1433 -d mcr.microsoft.com/mssql/server:2017-CU8-ubuntu
+```
+
+The connection string we will use (because we've selected an alternate port) is:
+
+```
+"Server=127.0.0.1,1434;Initial Catalog=AGS;Persist Security Info=False;User Id=SA;Password=tMk%e9?FsE7=tsSz"
+```
+
+In order to setup our environment, we need to add the dotnet EntityFramework tooling so that we have some helpful command line options:
+
+```
+dotnet tool install -g dotnet-ef
+```
+
+On our development system, we had a database already set up that we could use.  [Following the instructions provided](https://www.learnentityframeworkcore.com/walkthroughs/existing-database) we scaffolded our classes from the existing database instance:
+
+```
+dotnet ef dbcontext scaffold "Server=DESKTOP-4IG278L\LUKEDEV;Database=NM_Research;Trusted_Connection=True;" Microsoft.EntityFrameworkCore.SqlServer -o Model -c "AgsContext"
+```
+
+And \*poof\*, we have our Model folder created and populated!
+
+
+### FHIR Models
+
+We're going to add a few .NET packages to manage FHIR serialization, since it [looks like they have some nice helpers built in](https://stackoverflow.com/questions/49314247/how-to-deserialise-json-to-fhir-valueset-resource-in-net).
+
+From the Package Manager, add in:
+
+* Hl7.Fhir.Support
+* Hl7.Fhir.R4
+
+
+### Traversing FHIR for PGx Elements
+
+Most of these findings are just embedded in code instead of being recorded here, but one example that has tripped me up so far has to do with getting from the `ServiceRequest` to the `PlanDefinition`.
+
+The `ServiceRequest` includes `instantiatesCanonical` which contains a canonical URI that represents a specific `PlanDefinition`.
+
+```
+    {
+      "fullUrl": "urn:uuid:46e47bc8-0792-4a0c-a396-a15ee8569616",
+      "resource": {
+        "resourceType": "ServiceRequest",
+        "meta": {
+          "profile": [
+            "http://hl7.org/fhir/uv/genomics-reporting/StructureDefinition/servicerequest"
+          ]
+        },
+        "language": "en-US",
+        "text": {
+          "status": "generated",
+          "div": "..."
+        },
+        "instantiatesCanonical": [
+          "urn:uuid:bcd8f4e6-f6ac-412d-8ce1-43c3fd26b896"
+        ],
+     ...
+```
+
+Within the original bundle, we can easily trace from the canonical reference to the actual `PlanDefinition` resource entry using the URI:
+
+```
+    {
+      "fullUrl": "urn:uuid:bcd8f4e6-f6ac-412d-8ce1-43c3fd26b896",
+      "resource": {
+        "resourceType": "PlanDefinition",
+        "language": "en-US",
+        "text": {
+          "status": "generated",
+          "div": "..."
+        },
+
+     ...
+```
+
+The problem I'm having is that I can't seem to navigate to the `PlanDefinition` given the canonical URI once it is loaded to the FHIR server.
+
+The `ServiceRequest` contains the exact same URI for the `PlanDefinition` when it has been loaded to the FHIR server - nothing happens to replace or update it with the internal ID/URI assigned to the actual `PlanDefinition`.  However, there's no capability to search for the `PlanDefinition` by that URI anymore.  Pulling back the entry, the URI is nowhere in the resource.
+
+Looking at the [`PlanDefinition` specification](https://hl7.org/fhir/plandefinition.html#resource), there is a `url` attribute that can be defined, as well as an `identifier`.  I'm wondering if either of these would be appropriate to be included as a way to search for and find our `PlanDefinition`.
+
+There are [several unsupported search fields](https://github.com/microsoft/fhir-server/blob/deaa3909e06fa863619d449158588d4802019372/src/Microsoft.Health.Fhir.R4.Core/Features/Definition/unsupported-search-parameters.json) in the MS FHIR Server, but it seems like these would be supported.  However, I'm not sure how this is currently handled within HAPI/SMILE CDR, and if this is a limitation of the MS implementation.
+
+The first thing will be to pull the latest code and see if this has been fixed already.
