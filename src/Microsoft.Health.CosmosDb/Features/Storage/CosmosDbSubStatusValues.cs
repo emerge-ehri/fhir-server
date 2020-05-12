@@ -3,16 +3,10 @@
 // Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // -------------------------------------------------------------------------------------------------
 
-using System;
-using Hl7.Fhir.Introspection;
-
-namespace Microsoft.Health.Fhir.Core.UnitTests.Features.Search
+namespace Microsoft.Health.CosmosDb.Features.Storage
 {
-    public static class PropertyMappingExtensions
+    public static class CosmosDbSubStatusValues
     {
-        public static Type GetElementType(this PropertyMapping mapping)
-        {
-            return mapping.ElementType;
-        }
+        public const int CustomerManagedKeyInaccessible = 4005;
     }
 }

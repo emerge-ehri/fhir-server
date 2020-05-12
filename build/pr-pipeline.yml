@@ -5,8 +5,8 @@ name: pr$(system.pullRequest.pullRequestNumber)-$(Date:yyyyMMdd)$(Rev:-r)
 trigger: none
 
 variables:
-- template: build-variables.yml
 - template: pr-variables.yml
+- template: build-variables.yml
 
 stages:
 - stage: BuildUnitTests
@@ -17,13 +17,13 @@ stages:
     pool:
       vmImage: $(WindowsVmImage)
     steps:
-    - template: build.yml
+    - template: ./jobs/build.yml
 
   - job: Linux
     pool:
       vmImage: 'ubuntu-latest'
     steps:
-    - template: build.yml
+    - template: ./jobs/build.yml
       parameters:
         packageArtifacts: false
 
@@ -31,7 +31,7 @@ stages:
   displayName: 'Build images'
   dependsOn: []
   jobs:
-  - template: docker-build-all.yml
+  - template: ./jobs/docker-build-all.yml
     parameters: 
       tag: $(ImageTag)
 
